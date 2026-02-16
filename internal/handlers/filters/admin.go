@@ -1,8 +1,6 @@
 package filters
 
 import (
-	"errors"
-
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
@@ -14,6 +12,6 @@ func Admin(id int64) handlers.Response {
 			return nil
 		}
 
-		return errors.New("user is not admin")
+		return ext.EndGroups
 	}
 }
