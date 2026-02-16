@@ -1,0 +1,24 @@
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install deps
+        run: |
+          apt update -y 
+          apt install -y gcc
+          npm i -g @tauri-apps/cli
+
+      - name: Build app
+        run: CGO_ENABLED=1 GOOS=linux GOARCH=amd64 CC=gcc go build -ldflags '-extldflags "-static"' -o app ./cmd/main.go
+
+      - name: Upload files to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            app
