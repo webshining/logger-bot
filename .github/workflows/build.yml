@@ -10,9 +10,8 @@ jobs:
 
       - name: Install deps
         run: |
-          apt update -y 
-          apt install -y gcc
-          npm i -g @tauri-apps/cli
+          sudo apt update -y 
+          sudo apt install -y gcc
 
       - name: Build app
         run: CGO_ENABLED=1 GOOS=linux GOARCH=amd64 CC=gcc go build -ldflags '-extldflags "-static"' -o app ./cmd/main.go
