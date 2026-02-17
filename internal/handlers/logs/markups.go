@@ -25,7 +25,20 @@ func (l *logs) logsMarkup() gotgbot.InlineKeyboardMarkup {
 	if len(row) > 0 {
 		buttons = append(buttons, row)
 	}
-	buttons = append(buttons, []gotgbot.InlineKeyboardButton{gotgbot.InlineKeyboardButton{Text: "Add", CallbackData: "files:add"}})
+	buttons = append(buttons, []gotgbot.InlineKeyboardButton{{Text: "Add", CallbackData: "files:add"}})
+
+	return gotgbot.InlineKeyboardMarkup{
+		InlineKeyboard: buttons,
+	}
+}
+
+func (l *logs) logMarkup(id uint) gotgbot.InlineKeyboardMarkup {
+	_, realtime := l.realtimeLogs[id]
+
+	buttons := [][]gotgbot.InlineKeyboardButton{
+		{{Text: fmt.Sprintf("Realtime: %t", realtime), CallbackData: fmt.Sprintf("file:realtime:%d", id)}},
+		{{Text: "Delete", CallbackData: fmt.Sprintf("file:delete:%d", id)}},
+	}
 
 	return gotgbot.InlineKeyboardMarkup{
 		InlineKeyboard: buttons,

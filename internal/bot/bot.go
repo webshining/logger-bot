@@ -9,6 +9,7 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/message"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -28,6 +29,7 @@ func New(settings settings.BotConfig, database *gorm.DB, logger *zap.Logger) *Bo
 
 	dispatcher := ext.NewDispatcher(nil)
 	dispatcher.AddHandlerToGroup(handlers.NewMessage(message.All, filters.Admin(settings.Admin)), -10)
+	dispatcher.AddHandlerToGroup(handlers.NewCallback(callbackquery.All, filters.Admin(settings.Admin)), -10)
 	logs.New(dispatcher, database, logger)
 
 	return &Bot{bot, dispatcher, logger.Named("bot")}
