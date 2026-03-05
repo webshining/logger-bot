@@ -13,4 +13,13 @@ type DatabaseConfig struct {
 type BotConfig struct {
 	Token string
 	Admin int64
+
+	Webhook *struct {
+		Domain *string
+		Secret *string
+		Path   *string
+
+		Host *string
+		Port *int64
+	}
 }

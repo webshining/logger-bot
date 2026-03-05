@@ -4,16 +4,13 @@ import (
 	"bot/internal/database/models"
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/conversation"
-	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers/filters/callbackquery"
 	"go.uber.org/zap"
 )
 
@@ -34,7 +31,7 @@ func (l *logs) deleteMessages(b *gotgbot.Bot, chatId int64) {
 }
 
 func (l *logs) watcher(b *gotgbot.Bot, message *gotgbot.Message, file models.File, ctx context.Context, cancel context.CancelFunc) {
-	text := fmt.Sprintf("`[` %s `]`", file.Name)
+	baseText := fmt.Sprintf("`[` %s `]`", file.Name)
 
 	go func() {
 		l.logger.Info("watcher started", zap.String("path", file.Path))
@@ -46,10 +43,11 @@ func (l *logs) watcher(b *gotgbot.Bot, message *gotgbot.Message, file models.Fil
 		var offset int64 = 0
 		defer func() {
 			content, _ := l.readFile(file.Path, offset)
-			message.EditText(b, text+fmt.Sprintf("\n\n```console\n%s\n```", content), &gotgbot.EditMessageTextOpts{ParseMode: "Markdown", ReplyMarkup: l.logMarkup(file.ID)})
+			message.EditText(b, fmt.Sprintf("%s\n\n```console\n%s\n```", baseText, content), &gotgbot.EditMessageTextOpts{ParseMode: "Markdown", ReplyMarkup: l.logMarkup(file.ID)})
 		}()
 
 		var prevText string = ""
+		var lastCheck int64 = time.Now().Unix()
 		for {
 			select {
 			case <-ctx.Done():
@@ -58,16 +56,24 @@ func (l *logs) watcher(b *gotgbot.Bot, message *gotgbot.Message, file models.Fil
 				content, newOffset := l.readFile(file.Path, offset)
 				offset = newOffset
 
-				text := fmt.Sprintf("%s\n\n```console\n%s\n```", text, content)
-				if text == prevText {
+				text := fmt.Sprintf("%s\n\n```console\n%s\n```", baseText, content)
+				now := time.Now().Unix()
+				if text == prevText && now-lastCheck < 5 {
 					continue
 				}
+				lastCheck = now
 				prevText = text
 				if _, _, err := message.EditText(b, text, &gotgbot.EditMessageTextOpts{ParseMode: "Markdown", ReplyMarkup: l.logMarkup(file.ID)}); err != nil {
-					if strings.Contains(err.(*gotgbot.TelegramError).Description, "message to edit not found") {
-						cancel()
+					var tgErr *gotgbot.TelegramError
+					if errors.As(err, &tgErr) {
+						if strings.Contains(tgErr.Description, "message to edit not found") {
+							cancel()
+						} else if !strings.Contains(tgErr.Description, "message is not modified:") {
+							l.logger.Error("err", zap.Error(err))
+						}
 					} else {
-						l.logger.Error("err", zap.Error(err))
+						cancel()
+						l.logger.Error("non-telegram error", zap.Error(err))
 					}
 				}
 			}
@@ -121,22 +127,4 @@ func (l *logs) readFile(path string, offset int64) (string, int64) {
 		offset = offsets[0]
 	}
 	return strings.TrimSpace(strings.Join(lines, "")), offset
-}
-
-func (l *logs) setupHandlers() {
-	l.dispatcher.AddHandlerToGroup(handlers.NewCommand("logs", l.files), 10)
-	l.dispatcher.AddHandlerToGroup(handlers.NewConversation(
-		[]ext.Handler{handlers.NewCallback(callbackquery.Equal("files:add"), l.addFile)},
-		map[string][]ext.Handler{
-			"NAME": {handlers.NewMessage(noCommands, l.addFileName)},
-			"PATH": {handlers.NewMessage(noCommands, l.addFilePath)},
-		},
-		&handlers.ConversationOpts{
-			Exits:        []ext.Handler{handlers.NewCommand("cancel", l.addFileCancel)},
-			StateStorage: conversation.NewInMemoryStorage(conversation.KeyStrategySenderAndChat),
-			AllowReEntry: true,
-		},
-	), 10)
-	l.dispatcher.AddHandlerToGroup(handlers.NewCallback(callbackquery.Prefix("files:"), l.filesCallback), 10)
-	l.dispatcher.AddHandlerToGroup(handlers.NewCallback(callbackquery.Prefix("file:"), l.fileCallback), 10)
 }
